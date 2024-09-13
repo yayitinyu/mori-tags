@@ -7,7 +7,7 @@
       <el-col :span="12" style="display: flex; justify-content: center; align-items: center;">
         <el-image 
           style="width: 100%;"
-          :src="require('@/assets/pay.jpg')"
+          :src="require('@/assets/donate.jpg')"
         />
       </el-col>
       <el-col :span="12">
