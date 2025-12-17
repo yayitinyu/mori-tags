@@ -1,5 +1,7 @@
 # Mori Tags - AI Tag Manager
 
+[English](README.md) | [中文](README_zh.md)
+
 A modern, glassmorphism-styled AI tag management tool built with Remix, Cloudflare Pages, and D1 Database.
 
 ## Features
