@@ -1,0 +1,118 @@
+@import url('https://chinese-fonts-cdn.deno.dev/packages/hcqyt/dist/ChillRoundFRegular/result.css');
+
+:root {
+  --primary-pink: #ffacdbe0;
+  --secondary-pink: #ffd6e0;
+  --deep-pink: #d63384;
+  --text-primary: #333333;
+  --glass-bg: rgba(255, 255, 255, 0.4);
+  --glass-border: rgba(255, 255, 255, 0.6);
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+  --font-main: '寒蝉全圆体', sans-serif;
+  --radius-lg: 24px;
+  --radius-md: 16px;
+  --radius-sm: 8px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-main);
+  background: linear-gradient(135deg, #fce0e6 0%, #faeef0 100%);
+  color: var(--text-primary);
+  min-height: 100vh;
+  font-weight: 400;
+  overflow-x: hidden;
+}
+
+/* Scrollbar Styling */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(214, 51, 132, 0.3);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(214, 51, 132, 0.5);
+}
+
+
+/* Glassmorphism Utilities */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.glass-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 40px 0 rgba(31, 38, 135, 0.2);
+}
+
+/* Button Styles */
+.btn {
+  padding: 0.5rem 1.2rem;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-main);
+  font-weight: bold;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background: var(--deep-pink);
+  color: white;
+  box-shadow: 0 4px 15px rgba(214, 51, 132, 0.3);
+}
+
+.btn-primary:hover {
+  background: #c21b6d;
+  transform: scale(1.05);
+}
+
+.btn-glass {
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--deep-pink);
+  border: 1px solid white;
+}
+
+.btn-glass:hover {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+/* Layout */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+  }
+}

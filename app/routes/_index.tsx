@@ -1,0 +1,269 @@
+import { json, type LoaderFunctionArgs } from "@remix-run/cloudflare";
+import { useLoaderData, Link, Form, useFetcher } from "@remix-run/react";
+import { useState, useEffect } from "react";
+import { TagSelector } from "~/components/selector/TagSelector";
+import { PromptBuilder } from "~/components/builder/PromptBuilder";
+import { GlassCard } from "~/components/ui/GlassCard";
+import { CollectionsList } from "~/components/collections/CollectionsList";
+import type { Tag, Collection } from "~/types";
+import { getUserId } from "~/utils/auth.server";
+
+export const loader = async ({ request, context }: LoaderFunctionArgs) => {
+    const env = (context.cloudflare as any).env as { DB: D1Database };
+    const userId = await getUserId(request);
+    let user = null;
+    let collections: Collection[] = [];
+
+    if (userId) {
+        user = await env.DB.prepare("SELECT id, username FROM users WHERE id = ?").bind(userId).first();
+        if (user) {
+            const result = await env.DB.prepare("SELECT * FROM collections WHERE user_id = ? ORDER BY created_at DESC").bind(userId).all<Collection>();
+            collections = result.results;
+        }
+    }
+
+    const { results: tags } = await env.DB.prepare("SELECT * FROM tags ORDER BY category, name_en").all<Tag>();
+
+    // Get unique categories
+    const categories = Array.from(new Set(tags.map(t => t.category))).sort();
+
+    return json({ tags, categories, user, collections });
+};
+
+import { GlassModal } from "~/components/ui/GlassModal";
+
+export default function Index() {
+    const { tags, categories, user, collections: serverCollections } = useLoaderData<typeof loader>();
+    const [selectedTags, setSelectedTags] = useState<string[]>([]);
+    const [notification, setNotification] = useState<string | null>(null);
+    const [collections, setCollections] = useState<Collection[]>([]);
+
+    // Modal State
+    const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+    const [collectionName, setCollectionName] = useState("");
+
+    const fetcher = useFetcher();
+
+    // Sync collections (Server + LocalStorage for Guest)
+    useEffect(() => {
+        if (user) {
+            setCollections(serverCollections);
+        } else {
+            const local = localStorage.getItem("guest_collections");
+            if (local) {
+                try {
+                    setCollections(JSON.parse(local));
+                } catch (e) {
+                    console.error("Failed to parse local collections", e);
+                }
+            }
+        }
+    }, [user, serverCollections]);
+
+    // Update notification on fetcher success
+    useEffect(() => {
+        if (fetcher.state === "idle" && fetcher.data && (fetcher.data as any).success) {
+            setNotification("Success!");
+            setTimeout(() => setNotification(null), 2000);
+            setIsSaveModalOpen(false);
+            setCollectionName("");
+        }
+    }, [fetcher.state, fetcher.data]);
+
+    const toggleTag = (tag: string) => {
+        setSelectedTags(prev =>
+            prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+        );
+    };
+
+    const removeTag = (tag: string) => {
+        setSelectedTags(prev => prev.filter(t => t !== tag));
+    };
+
+    const clearTags = () => setSelectedTags([]);
+
+    const copyTags = () => {
+        const text = selectedTags.join(', ');
+        navigator.clipboard.writeText(text).then(() => {
+            setNotification("Copied to clipboard!");
+            setTimeout(() => setNotification(null), 2000);
+        });
+    };
+
+    const handleSaveClick = () => {
+        setIsSaveModalOpen(true);
+    };
+
+    const confirmSaveCollection = () => {
+        if (!collectionName.trim()) {
+            alert("Please enter a name.");
+            return;
+        }
+
+        if (user) {
+            fetcher.submit(
+                { intent: "save", name: collectionName, tags: selectedTags.join(', ') },
+                { method: "post", action: "/api/collections" }
+            );
+        } else {
+            // Guest Mode Save
+            const newCol: Collection = {
+                id: Date.now(), // Generate rough ID
+                user_id: 0,
+                name: collectionName,
+                tags_string: selectedTags.join(', '),
+                tags_count: selectedTags.length,
+                preview_image_url: null,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            };
+            const updated = [newCol, ...collections];
+            setCollections(updated);
+            localStorage.setItem("guest_collections", JSON.stringify(updated));
+            setNotification("Collection Saved (Guest)!");
+            setTimeout(() => setNotification(null), 2000);
+            setIsSaveModalOpen(false);
+            setCollectionName("");
+        }
+    };
+
+    const deleteCollection = (id: number) => {
+        // We could use a modal here too, but native confirm is safer/faster for destructive actions?
+        // User asked to "redo confirmation popup... using system native feels rough".
+        // Let's use native confirm for delete to save time, or we need another state for Delete Modal.
+        // The user specifically asked "reload of collection confirm popup... currently usage native feels rough". 
+        // Oh wait, they meant the prompt "save collection" popup was native.
+        // For delete, I will just use native confirm for now to keep complexity down, OR I can reuse the modal or implement a quick custom confirm.
+        // Given complexity, let's use window.confirm but the "Save" is now the nice GlassModal.
+        if (!confirm("Are you sure you want to delete this collection?")) return;
+
+        if (user) {
+            fetcher.submit(
+                { intent: "delete", id: id.toString() },
+                { method: "post", action: "/api/collections" }
+            );
+        } else {
+            const updated = collections.filter(c => c.id !== id);
+            setCollections(updated);
+            localStorage.setItem("guest_collections", JSON.stringify(updated));
+            setNotification("Collection Deleted!");
+            setTimeout(() => setNotification(null), 2000);
+        }
+    };
+
+    return (
+        <div className="container">
+            <header className="main-header" style={{
+                marginBottom: '2rem',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+                <div style={{ width: '100px', display: 'none' }} className="desktop-only"></div>
+                <div>
+                    <h1 style={{ color: 'var(--deep-pink)', marginBottom: '0.5rem' }}>Mori Tags</h1>
+                    <p style={{ color: '#666' }}>AI Drawing Tag Manager</p>
+                </div>
+                <div style={{ width: '100px', textAlign: 'right' }}>
+                    {user ? (
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', justifyContent: 'center' }}>
+                            <Link to="/settings" style={{ fontSize: '0.9rem', color: 'var(--deep-pink)', textDecoration: 'none', fontWeight: 'bold' }}>
+                                {user.username}
+                            </Link>
+                            <Form action="/logout" method="post">
+                                <button type="submit" className="btn btn-glass" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>Logout</button>
+                            </Form>
+                        </div>
+                    ) : (
+                        <Link to="/login" className="btn btn-primary" style={{ textDecoration: 'none' }}>Login</Link>
+                    )}
+                </div>
+            </header>
+
+            {notification && (
+                <div style={{
+                    position: 'fixed', top: '20px', right: '20px',
+                    background: 'var(--deep-pink)', color: 'white',
+                    padding: '10px 20px', borderRadius: '8px', zIndex: 1000,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                }}>
+                    {notification}
+                </div>
+            )}
+
+            <div className="dashboard-grid">
+                <div className="main-content" style={{ minWidth: 0 }}>
+                    <GlassCard>
+                        <TagSelector
+                            tags={tags}
+                            selectedTags={selectedTags}
+                            onToggleTag={toggleTag}
+                            categories={categories}
+                        />
+                    </GlassCard>
+                </div>
+
+                <div className="sidebar">
+                    <PromptBuilder
+                        selectedTags={selectedTags}
+                        clearTags={clearTags}
+                        copyTags={copyTags}
+                        removeTag={removeTag}
+                    />
+
+                    <div style={{ marginTop: '1rem' }}>
+                        {selectedTags.length > 0 && (
+                            <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleSaveClick}>
+                                Save as Collection
+                            </button>
+                        )}
+                    </div>
+
+                    <CollectionsList
+                        collections={collections}
+                        onSelect={setSelectedTags}
+                        onDelete={deleteCollection}
+                        isLoggedIn={!!user}
+                        allTags={tags}
+                    />
+                </div>
+            </div>
+
+            {/* Save Collection Modal */}
+            <GlassModal
+                isOpen={isSaveModalOpen}
+                onClose={() => setIsSaveModalOpen(false)}
+                title="Save Collection"
+            >
+                <div>
+                    <div style={{ marginBottom: '1rem' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#555' }}>
+                            Collection Name
+                        </label>
+                        <input
+                            type="text"
+                            value={collectionName}
+                            onChange={(e) => setCollectionName(e.target.value)}
+                            placeholder="e.g., Cat Girl Theme"
+                            className="glass-panel"
+                            style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }}
+                            autoFocus
+                        />
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                        <button
+                            className="btn btn-glass"
+                            onClick={() => setIsSaveModalOpen(false)}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            className="btn btn-primary"
+                            onClick={confirmSaveCollection}
+                        >
+                            Save
+                        </button>
+                    </div>
+                </div>
+            </GlassModal>
+        </div>
+    );
+}

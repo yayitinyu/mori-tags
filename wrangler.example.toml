@@ -1,0 +1,8 @@
+name = "mori-tags"
+compatibility_date = "2024-04-01"
+pages_build_output_dir = "./build/client"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mori-tags-db"
+database_id = "YOUR_DATABASE_ID_HERE"

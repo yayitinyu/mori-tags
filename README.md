@@ -1,46 +1,95 @@
-# autocue
-🌈 AI绘画标签提词器：将标签进行分类整理，支持中文显示、加权、降权等隐藏功能，本项目终身开源，禁止商用，最讨厌未经同意将其设置成各种收费版本。
+# Mori Tags - AI Tag Manager
 
-<p align="center">
-  <img src="https://img.shields.io/badge/vue->=3.2.13-ff69b4.svg" alt="vue">
-  <img src="https://img.shields.io/badge/elementplus->=2.2.2-6bb59a.svg" alt="element-plus">
-  <img src="https://img.shields.io/badge/elementplus/icons->=0.0.11-brightgreen.svg" alt="element-plus/icons">
-</p>
+A modern, glassmorphism-styled AI tag management tool built with Remix, Cloudflare Pages, and D1 Database.
 
-## 项目预览
-![项目预览](https://tinygeeker.github.io/static/imgs/autocue/001.png)
+## Features
 
-## 使用方法
+- **Tag Management**: Browse and select AI drawing tags (English/Chinese).
+- **Prompt Builder**: Select tags to build prompts, copy to clipboard, or clear.
+- **Smart Search/Filter**: Efficient tag filtering with client-side optimization.
+- **Collections**: Save favorite tag combinations with image previews.
+- **User System**: Admin authentication and account management (change username/password).
+- **Responsive Design**: Mobile-friendly layout with a beautiful pink glassmorphism theme.
 
-> 下载该库
+## Tech Stack
+
+- **Framework**: [Remix](https://remix.run) (Vite)
+- **Deployment**: Cloudflare Pages
+- **Database**: Cloudflare D1 (SQLite)
+- **Styling**: Vanilla CSS + Glassmorphism
+
+---
+
+## 🚀 Production Deployment Guide
+
+To deploy this application to the internet, follow these steps:
+
+### 1. Prerequisites
+- A [Cloudflare](https://dash.cloudflare.com/) account.
+- `npm` installed locally.
+
+### 2. Login to Cloudflare
+Open your terminal in the project folder and login:
+```bash
+npx wrangler login
 ```
-git clone https://github.com/tinygeeker/autocue.git
+
+### 3. Create Remote Database
+Create a D1 database on Cloudflare:
+```bash
+npx wrangler d1 create mori-tags-db
+```
+*Take note of the `database_id` output by this command.*
+
+### 4. Update Configuration
+Open `wrangler.toml` and update the `[[d1_databases]]` section with your **new** `database_id`:
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "mori-tags-db"
+database_id = "YOUR-GENERATED-ID-HERE" 
 ```
 
-> 安装依赖
+### 5. Deploy Schema & Data
+Initialize the remote database with the schema:
+```bash
+npx wrangler d1 execute DB --remote --file=./schema.sql
 ```
-npm install
+*(Optional) Seed data if you have the migration file:*
+```bash
+npx wrangler d1 execute DB --remote --file=./seed.sql
 ```
 
-> 运行预览
+### 6. Deploy Application
+Build and deploy the site to Cloudflare Pages:
+```bash
+npm run deploy
 ```
-npm run tinygeeker
-```
+This will give you a live URL (e.g., `https://mori-tags.pages.dev`).
 
-## 项目贡献
+### 7. First Login
+Visit your live site. Login with username `admin`.
+*   If this is the first user, it will create the account.
+*   The password you enter will become the admin password.
+*   Go to **Settings** (click your username) to change your password later.
 
-如果你觉得项目有用，就请我喝杯奶茶吧。 :tropical_drink:
+---
 
-![donate](https://tinygeeker.github.io/userinfo/donate/multiple.jpg)
+## 🛠️ Local Development
 
-## 浏览器支持情况
+1. **Install Dependencies**
+   ```bash
+   npm install
+   ```
 
-| [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/edge/edge_48x48.png" alt="IE / Edge" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>IE / Edge | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/firefox/firefox_48x48.png" alt="Firefox" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Firefox | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png" alt="Chrome" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Chrome | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png" alt="Safari" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Safari | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari-ios/safari-ios_48x48.png" alt="iOS Safari" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>iOS Safari | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/samsung-internet/samsung-internet_48x48.png" alt="Samsung" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Samsung | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/opera/opera_48x48.png" alt="Opera" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Opera | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/electron/electron_48x48.png" alt="Electron" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Electron |
-| --------- | --------- | --------- | --------- | --------- | --------- | --------- | --------- |
-| IE11, Edge| last version| last version| last version| last version| last version| last version| last version
+2. **Local Database Setup**
+   ```bash
+   npx wrangler d1 execute DB --local --file=./schema.sql
+   # Seed data
+   # npx wrangler d1 execute DB --local --file=./seed.sql
+   ```
 
-## License
-
-[MIT](https://github.com/tinygeeker/autocue/blob/main/LICENSE)
-
-Copyright (c) 2021-now tinygeeker
+3. **Run Dev Server**
+   ```bash
+   npm run dev
+   ```
