@@ -22,10 +22,28 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
         }
     }
 
-    const { results: tags } = await env.DB.prepare("SELECT * FROM tags ORDER BY category, name_en").all<Tag>();
+    const { results: systemTags } = await env.DB.prepare("SELECT * FROM tags ORDER BY category, name_en").all<Tag>();
+    const tags = [...systemTags];
+
+    if (user) {
+        const { results: customTags } = await env.DB.prepare("SELECT * FROM custom_tags WHERE user_id = ? ORDER BY name").bind(user.id).all<any>();
+        const formattedCustomTags: Tag[] = customTags.map(t => ({
+            id: t.id,
+            name_en: t.name,
+            name_zh: t.name_zh || '', // Support Chinese name
+            category: t.category || 'Custom', // Support Custom Category
+            is_negative: false
+        }));
+        tags.push(...formattedCustomTags);
+    }
 
     // Get unique categories
-    const categories = Array.from(new Set(tags.map(t => t.category))).sort();
+    // Get unique categories and sort consistently with frontend
+    const categories = Array.from(new Set(tags.map(t => t.category))).sort((a, b) => {
+        if (a === 'Custom') return 1;
+        if (b === 'Custom') return -1;
+        return a.localeCompare(b, 'zh-CN'); // Explicitly use zh-CN for consistency
+    });
 
     return json({ tags, categories, user, collections });
 };
@@ -44,6 +62,36 @@ export default function Index() {
 
     const fetcher = useFetcher();
 
+    // Custom Tags State for Guest
+    const [guestCustomTags, setGuestCustomTags] = useState<Tag[]>([]);
+
+    // Combined Tags
+    const allTags = user ? tags : [...tags, ...guestCustomTags];
+
+    // Priority list for categories
+    const categoryPriority: Record<string, number> = {
+        "Custom": 999,
+        "作品角色": 1, // Characters
+        "角色": 1,
+        "风格": 2, // Style
+        "构图": 3, // Composition/Angle
+        "衣装": 4, // Clothing
+        "下身装饰": 5, // Legwear??
+        "物品": 6, // Objects
+        "背景": 7, // Background
+        "R-18": 99,
+        "限制级": 99
+    };
+
+    // Re-derive categories to include 'Custom' if present
+    const allCategories = Array.from(new Set(allTags.map(t => t.category))).sort((a, b) => {
+        if (a === 'All') return -1;
+        const pA = categoryPriority[a] || 50;
+        const pB = categoryPriority[b] || 50;
+        if (pA !== pB) return pA - pB;
+        return a.localeCompare(b, 'zh-CN');
+    });
+
     // Sync collections (Server + LocalStorage for Guest)
     useEffect(() => {
         if (user) {
@@ -60,15 +108,72 @@ export default function Index() {
         }
     }, [user, serverCollections]);
 
-    // Update notification on fetcher success
     useEffect(() => {
         if (fetcher.state === "idle" && fetcher.data && (fetcher.data as any).success) {
             setNotification("Success!");
             setTimeout(() => setNotification(null), 2000);
             setIsSaveModalOpen(false);
             setCollectionName("");
+            // Clear input if it was a custom tag add? (Handled in TagSelector potentially)
         }
     }, [fetcher.state, fetcher.data]);
+
+    // Load Guest Custom Tags
+    useEffect(() => {
+        if (!user) {
+            try {
+                const stored = localStorage.getItem("guest_custom_tags");
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        // Patch legacy tags to have is_custom: true
+                        const patched = parsed.map((t: any) => ({
+                            ...t,
+                            is_custom: true,
+                            category: t.category || "Custom",
+                            name_zh: t.name_zh || ""
+                        }));
+                        setGuestCustomTags(patched);
+                        localStorage.setItem("guest_custom_tags", JSON.stringify(patched));
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to load custom tags", e);
+            }
+        }
+    }, [user]);
+
+    const handleAddCustomTag = (name: string, category: string = 'Custom', name_zh: string = '') => {
+        if (user) {
+            fetcher.submit({ intent: "add", name, category, name_zh }, { method: "post", action: "/api/custom-tags" });
+        } else {
+            const newTag: Tag = {
+                id: Date.now(),
+                name_en: name,
+                name_zh: name_zh,
+                category: category,
+                is_negative: false,
+                is_custom: true
+            };
+            const updated = [...guestCustomTags, newTag];
+            setGuestCustomTags(updated);
+            localStorage.setItem("guest_custom_tags", JSON.stringify(updated));
+        }
+    };
+
+    const handleDeleteCustomTag = (tag: Tag) => {
+        if (!confirm(`Delete custom tag "${tag.name_en}"?`)) return;
+
+        if (user) {
+            fetcher.submit({ intent: "delete", id: tag.id.toString() }, { method: "post", action: "/api/custom-tags" });
+        } else {
+            const updated = guestCustomTags.filter(t => t.id !== tag.id);
+            setGuestCustomTags(updated);
+            localStorage.setItem("guest_custom_tags", JSON.stringify(updated));
+            // Also remove from selected if present
+            setSelectedTags(prev => prev.filter(t => t !== tag.name_en));
+        }
+    };
 
     const toggleTag = (tag: string) => {
         setSelectedTags(prev =>
@@ -162,9 +267,9 @@ export default function Index() {
                     <h1 style={{ color: 'var(--deep-pink)', marginBottom: '0.5rem' }}>Mori Tags</h1>
                     <p style={{ color: '#666' }}>AI Drawing Tag Manager</p>
                 </div>
-                <div style={{ width: '100px', textAlign: 'right' }}>
+                <div style={{ minWidth: '100px', textAlign: 'right' }}>
                     {user ? (
-                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                             <Link to="/settings" style={{ fontSize: '0.9rem', color: 'var(--deep-pink)', textDecoration: 'none', fontWeight: 'bold' }}>
                                 {user.username}
                             </Link>
@@ -193,10 +298,12 @@ export default function Index() {
                 <div className="main-content" style={{ minWidth: 0 }}>
                     <GlassCard>
                         <TagSelector
-                            tags={tags}
+                            tags={allTags}
                             selectedTags={selectedTags}
                             onToggleTag={toggleTag}
-                            categories={categories}
+                            categories={allCategories}
+                            onAddCustomTag={handleAddCustomTag}
+                            onDeleteCustomTag={handleDeleteCustomTag}
                         />
                     </GlassCard>
                 </div>

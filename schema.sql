@@ -32,3 +32,14 @@ CREATE TABLE IF NOT EXISTS collections (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES users(id)
 );
+
+-- Custom Tags table
+CREATE TABLE IF NOT EXISTS custom_tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    name_zh TEXT,
+    category TEXT DEFAULT 'Custom',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+);
